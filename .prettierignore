@@ -1,0 +1,8 @@
+src/agent/mcp/playwright-mcp/
+package.json
+tsconfig.json
+package-lock.json
+
+dist/
+node_modules/
+.env

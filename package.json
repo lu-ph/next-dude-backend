@@ -1,0 +1,39 @@
+{
+  "name": "next-dude-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc --outDir dist --rootDir src",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.60",
+    "@ai-sdk/react": "^4.0.96",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.259",
+    "@anthropic-ai/sdk": "^0.123.0",
+    "@fastify/websocket": "^11.3.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@napi-rs/canvas": "^1.0.8",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
+    "ai": "^7.0.93",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.1",
+    "pdfjs-dist": "^6.3.289",
+    "typescript": "^7.0.2",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/ws": "^8.18.1",
+    "prettier": "3.9.6",
+    "tsx": "^4.19.3"
+  }
+}
