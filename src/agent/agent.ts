@@ -116,6 +116,7 @@ export class Agent {
         ...(this.sessionId ? { resume: this.sessionId } : {}),
         settingSources: ["project"],
         skills: "all",
+        tools: [],
         includePartialMessages: true,
         env: {
           ...process.env,
@@ -131,7 +132,7 @@ export class Agent {
           },
           pdfViewer: createPDFViewerMcpServer(this.wsCtx),
         },
-        permissionMode: "bypassPermissions",
+        permissionMode: "dontAsk",
         allowedTools: ["mcp__playwright__*", "mcp__pdf-viewer__*"],
       },
     })
