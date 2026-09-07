@@ -30,7 +30,7 @@ export const PDFJumpToPageDoneSchema = z.object({
   id: z.string().optional(),
   payload: z.object({
     pageNum: z.number().int().positive("page number must be greater than 0"),
-    currentView: z.string().min(1, "current pdf view can not be null")
+    currentView: z.string().min(1, "current pdf view can not be null"),
   }),
 })
 
@@ -39,7 +39,7 @@ export const PDFNextPageDoneSchema = z.object({
   id: z.string().optional(),
   payload: z.object({
     pageNum: z.number().int().positive("page number must be greater than 0"),
-    currentView: z.string().min(1, "current pdf view can not be null")
+    currentView: z.string().min(1, "current pdf view can not be null"),
   }),
 })
 
@@ -48,7 +48,7 @@ export const PDFPreviousPageDoneSchema = z.object({
   id: z.string().optional(),
   payload: z.object({
     pageNum: z.number().int().positive("page number must be greater than 0"),
-    currentView: z.string().min(1, "current pdf view can not be null")
+    currentView: z.string().min(1, "current pdf view can not be null"),
   }),
 })
 

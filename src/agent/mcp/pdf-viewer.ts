@@ -7,9 +7,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk"
 import type { McpToolResult } from "../../types/agent-types.js"
-import {
-  PDFMessageType,
-} from "../../types/pdf-types.js"
+import { PDFMessageType } from "../../types/pdf-types.js"
 import type { WsContext } from "../../session/agent-session.js"
 import { pdfSessionManager } from "../../session/pdf-session.js"
 import { getFolderItemsList } from "../../session/temporary-files.js"
@@ -66,18 +64,18 @@ function getActiveSocket(wsCtx: WsContext): WebSocket {
   return ws
 }
 
-async function loadPDFPage(
-  pdfName: string,
-  pageNum: number,
-  wsCtx: WsContext,
-) {
+async function loadPDFPage(pdfName: string, pageNum: number, wsCtx: WsContext) {
   const session = pdfSessionManager.getSession(wsCtx.sessionId)
   if (!session || session.pdfName !== path.basename(pdfName)) {
     throw new Error(`PDF session not found for ${pdfName}`)
   }
 
   const document = await pdfSessionManager.loadInstance(session)
-  if (!Number.isInteger(pageNum) || pageNum < 1 || pageNum > document.numPages) {
+  if (
+    !Number.isInteger(pageNum) ||
+    pageNum < 1 ||
+    pageNum > document.numPages
+  ) {
     throw new Error(`PDF page ${pageNum} is out of range`)
   }
 
@@ -105,19 +103,25 @@ async function getLocalPDFPage(
     }).promise
 
     return {
-      content: [{
-        type: "image",
-        data: canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""),
-        mimeType: "image/png",
-      }],
+      content: [
+        {
+          type: "image",
+          data: canvas
+            .toDataURL("image/png")
+            .replace(/^data:image\/png;base64,/, ""),
+          mimeType: "image/png",
+        },
+      ],
     }
   } catch (error: unknown) {
     return {
       isError: true,
-      content: [{
-        type: "text",
-        text: `Failed to render PDF page ${pageNum}: ${error instanceof Error ? error.message : String(error)}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Failed to render PDF page ${pageNum}: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
     }
   }
 }
@@ -131,10 +135,12 @@ async function listSessionFiles(wsCtx: WsContext): Promise<McpToolResult> {
   } catch (error: unknown) {
     return {
       isError: true,
-      content: [{
-        type: "text",
-        text: `Failed to list session files: ${error instanceof Error ? error.message : String(error)}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Failed to list session files: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
     }
   }
 }

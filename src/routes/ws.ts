@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify"
 import type { WebSocket } from "ws"
 import { AgentDispatcher } from "../handler/agent-message-handler.js"
 import { AgentMessageType, ClientMessageSchema } from "../types/agent-types.js"
+import { logAgentError, logWsReceive } from "../utils/log.js"
 
 interface ExtWebSocket extends WebSocket {
   isAlive?: boolean
@@ -32,6 +33,7 @@ export const websocketRoutes: FastifyPluginAsync = async (fastify) => {
 
     socket.on("message", async (rawData: Buffer) => {
       try {
+        logWsReceive(rawData.toString("utf-8"), { route: "/ws" })
         const rawJson = JSON.parse(rawData.toString("utf-8"))
 
         const parseResult = ClientMessageSchema.safeParse(rawJson)
@@ -49,6 +51,10 @@ export const websocketRoutes: FastifyPluginAsync = async (fastify) => {
 
         await dispatcher.dispatch(socket, parseResult.data, fastify.log)
       } catch (err) {
+        logAgentError(err, {
+          route: "/ws",
+          phase: "message parsing or dispatch",
+        })
         AgentDispatcher.send(socket, {
           type: AgentMessageType.ERROR,
           payload: { error: "Payload must be a valid JSON string" },

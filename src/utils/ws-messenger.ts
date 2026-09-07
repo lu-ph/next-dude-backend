@@ -4,9 +4,11 @@ import type {
   BackendToClientMessage,
   ClientToBackendMessage,
 } from "../types/types.js"
+import { logWsReceive, logWsSend } from "./log.js"
 
 export function sendOnly(ws: WebSocket, message: BackendToClientMessage): void {
   if (ws.readyState === WebSocket.OPEN) {
+    logWsSend(message, { mode: "sendOnly" })
     ws.send(JSON.stringify(message))
   }
 }
@@ -47,6 +49,7 @@ export function sendAndWait<
     const onMessage = (rawData: unknown) => {
       try {
         const response = JSON.parse(String(rawData))
+        logWsReceive(response, { mode: "sendAndWait" })
 
         const isMatchedId = matchId ? response.id === matchId : true
         const isMatchedType = matchType ? response.type === matchType : true
@@ -70,6 +73,7 @@ export function sendAndWait<
     ws.on("message", onMessage)
 
     try {
+      logWsSend(payloadMessage, { mode: "sendAndWait" })
       ws.send(JSON.stringify(payloadMessage))
     } catch (err) {
       cleanup()

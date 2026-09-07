@@ -66,7 +66,6 @@ export const ChatInterruptSchema = z.object({
   payload: z.object({ reason: z.string().optional() }).optional(),
 })
 
-
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   CreateSessionSchema,
   ChatRequestSchema,

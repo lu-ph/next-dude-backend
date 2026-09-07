@@ -2,6 +2,7 @@ import { query, type Query } from "@anthropic-ai/claude-agent-sdk"
 import { createPDFViewerMcpServer } from "./mcp/pdf-viewer.js"
 import type { AgentInput, AIConfig } from "../types/agent-types.js"
 import type { WsContext } from "../session/agent-session.js"
+import { logAgentError } from "../utils/log.js"
 
 type UserContentBlock =
   | { type: "text"; text: string }
@@ -100,6 +101,7 @@ export class Agent {
     try {
       this.init(llmConfig)
     } catch (error: unknown) {
+      logAgentError(error, { phase: "agent initialization" })
       const errorMsg = error instanceof Error ? error.message : String(error)
       throw new Error(`Error initializing agent: ${errorMsg}`)
     }
@@ -169,6 +171,7 @@ export class Agent {
     try {
       await this.currentQuery.interrupt()
     } catch (error: unknown) {
+      logAgentError(error, { phase: "agent pause" })
       const errorMsg = error instanceof Error ? error.message : String(error)
       throw new Error(`Error while pausing agent: ${errorMsg}`)
     }
@@ -189,7 +192,9 @@ function stripDataUrl(data: string): string {
     : data
 }
 
-function parseImage(image: string): Extract<UserContentBlock, { type: "image" }>["source"] {
+function parseImage(
+  image: string,
+): Extract<UserContentBlock, { type: "image" }>["source"] {
   const dataUrlMatch = image.match(
     /^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/,
   )
@@ -198,10 +203,7 @@ function parseImage(image: string): Extract<UserContentBlock, { type: "image" }>
     return {
       type: "base64",
       media_type: dataUrlMatch[1] as
-        | "image/jpeg"
-        | "image/png"
-        | "image/gif"
-        | "image/webp",
+        "image/jpeg" | "image/png" | "image/gif" | "image/webp",
       data: dataUrlMatch[2]!,
     }
   }

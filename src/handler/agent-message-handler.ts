@@ -12,6 +12,7 @@ import { addItemToFolder, createFolder } from "../session/temporary-files.js"
 import { pdfSessionManager } from "../session/pdf-session.js"
 import { randomUUID } from "crypto"
 import path from "path"
+import { logWsSend } from "../utils/log.js"
 
 export type MessageHandler<T extends AgentMessageType> = (
   ws: WebSocket,
@@ -49,6 +50,7 @@ export class AgentDispatcher {
 
   public static send<P>(ws: WebSocket, response: BackendMessage<P>): void {
     if (ws.readyState === WebSocket.OPEN) {
+      logWsSend(response, { mode: "agentDispatcher" })
       ws.send(JSON.stringify(response))
     }
   }
@@ -63,7 +65,10 @@ export class AgentDispatcher {
       await addItemToFolder(
         sessionId,
         pdfName,
-        Buffer.from(msg.payload.pdf.data.replace(/^data:application\/pdf;base64,/, ""), "base64"),
+        Buffer.from(
+          msg.payload.pdf.data.replace(/^data:application\/pdf;base64,/, ""),
+          "base64",
+        ),
       )
       pdfSessionManager.getOrCreateSession(
         sessionId,
