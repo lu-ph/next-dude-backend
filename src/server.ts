@@ -11,7 +11,10 @@ await app.register(fastifyWebsocket, {
 await app.register(websocketRoutes)
 
 try {
-  await app.listen({ port: 8080, host: "0.0.0.0" })
+  const host = process.env.HOST ?? "0.0.0.0"
+  const port = Number(process.env.PORT ?? 8080)
+
+  await app.listen({ port, host })
 } catch (err) {
   app.log.error(err)
   process.exit(1)
