@@ -22,3 +22,17 @@ export function getAIConfig(): AIConfig {
     baseUrl,
   }
 }
+
+export function getCorsOrigin(): string[] {
+  const originEnv = process.env.CORS_ALLOWED_ORIGINS;
+  
+  if (!originEnv) {
+    throw new Error("env variable CORS_ALLOWED_ORIGINS not set");
+  }
+  
+  if (originEnv.includes(',')) {
+    return originEnv.split(',').map(item => item.trim())
+  }
+  
+  return [originEnv.trim()]
+}

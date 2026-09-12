@@ -3,13 +3,17 @@ import fastifyCors from "@fastify/cors"
 import fastifyWebsocket from "@fastify/websocket"
 import { websocketRoutes } from "./routes/ws.js"
 import { createSessionRoutes } from "./routes/api.js"
+import { getCorsOrigin } from "./utils/env-util.js";
 
 const app = Fastify({ logger: true, bodyLimit: 500 * 1024 * 1024 })
 
+const allowedOrigins = getCorsOrigin();
+
 await app.register(fastifyCors, {
-  origin: process.env.FRONTEND_ORIGIN ?? true,
+  origin: allowedOrigins,
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-Filename"],
+  credentials: true,
 })
 
 app.addContentTypeParser(
