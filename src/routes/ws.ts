@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify"
 import type { WebSocket } from "ws"
 import { AgentDispatcher } from "../handler/agent-message-handler.js"
+import { sessionManager } from "../session/session.js"
 import { AgentMessageType, ClientMessageSchema } from "../types/agent-types.js"
 import { logAgentError, logWsReceive } from "../utils/log.js"
 
@@ -23,43 +24,68 @@ export const websocketRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onClose", () => clearInterval(heartbeatInterval))
 
   // websocket routes
-  fastify.get("/ws", { websocket: true }, (connection, req) => {
-    const socket: ExtWebSocket = connection
-    socket.isAlive = true
+  fastify.get<{ Querystring: { sessionId?: string } }>(
+    "/ws",
+    {
+      websocket: true,
+      preValidation: async (request, reply) => {
+        const sessionId = request.query.sessionId
 
-    socket.on("pong", () => {
-      socket.isAlive = true
-    })
-
-    socket.on("message", async (rawData: Buffer) => {
-      try {
-        logWsReceive(rawData.toString("utf-8"), { route: "/ws" })
-        const rawJson = JSON.parse(rawData.toString("utf-8"))
-
-        const parseResult = ClientMessageSchema.safeParse(rawJson)
-
-        if (!parseResult.success) {
-          AgentDispatcher.send(socket, {
-            type: AgentMessageType.ERROR,
-            payload: {
-              error: "Invalid protocol frame",
-              details: parseResult.error.format(),
-            },
+        if (!sessionId) {
+          return reply.code(400).send({
+            error: "sessionId query parameter is required",
           })
-          return
         }
 
-        await dispatcher.dispatch(socket, parseResult.data, fastify.log)
-      } catch (err) {
-        logAgentError(err, {
-          route: "/ws",
-          phase: "message parsing or dispatch",
-        })
-        AgentDispatcher.send(socket, {
-          type: AgentMessageType.ERROR,
-          payload: { error: "Payload must be a valid JSON string" },
-        })
-      }
-    })
-  })
+        if (!sessionManager.getSession(sessionId)) {
+          return reply.code(404).send({ error: "Session not found" })
+        }
+      },
+    },
+    (connection, request) => {
+      const socket: ExtWebSocket = connection
+      socket.isAlive = true
+
+      sessionManager.registerConnection(request.query.sessionId!, socket)
+
+      socket.on("pong", () => {
+        socket.isAlive = true
+      })
+
+      socket.on("close", () => {
+        sessionManager.removeConnection(socket)
+      })
+
+      socket.on("message", async (rawData: Buffer) => {
+        try {
+          logWsReceive(rawData.toString("utf-8"), { route: "/ws" })
+          const rawJson = JSON.parse(rawData.toString("utf-8"))
+
+          const parseResult = ClientMessageSchema.safeParse(rawJson)
+
+          if (!parseResult.success) {
+            AgentDispatcher.send(socket, {
+              type: AgentMessageType.ERROR,
+              payload: {
+                error: "Invalid protocol frame",
+                details: parseResult.error.format(),
+              },
+            })
+            return
+          }
+
+          await dispatcher.dispatch(socket, parseResult.data, fastify.log)
+        } catch (err) {
+          logAgentError(err, {
+            route: "/ws",
+            phase: "message parsing or dispatch",
+          })
+          AgentDispatcher.send(socket, {
+            type: AgentMessageType.ERROR,
+            payload: { error: "Payload must be a valid JSON string" },
+          })
+        }
+      })
+    },
+  )
 }

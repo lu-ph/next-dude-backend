@@ -6,13 +6,9 @@ import {
   type ClientMessage,
   type MessageTypeOf,
 } from "../types/agent-types.js"
-import { sessionManager } from "../session/agent-session.js"
 import { getAIConfig } from "../utils/env-util.js"
-import { addItemToFolder, createFolder } from "../session/temporary-files.js"
-import { pdfSessionManager } from "../session/pdf-session.js"
-import { randomUUID } from "crypto"
-import path from "path"
 import { logWsSend } from "../utils/log.js"
+import { sessionManager } from "../session/session.js"
 
 export type MessageHandler<T extends AgentMessageType> = (
   ws: WebSocket,
@@ -56,52 +52,22 @@ export class AgentDispatcher {
   }
 
   private registerDefaultHandlers(): void {
-    this.register(AgentMessageType.CREATE_SESSION, async (ws, msg, logger) => {
-      const sessionId = randomUUID()
-      const llmConfig = getAIConfig()
-
-      const sessionFolder = await createFolder(sessionId)
-      const pdfName = path.basename(msg.payload.pdf.filename)
-      await addItemToFolder(
-        sessionId,
-        pdfName,
-        Buffer.from(
-          msg.payload.pdf.data.replace(/^data:application\/pdf;base64,/, ""),
-          "base64",
-        ),
-      )
-      pdfSessionManager.getOrCreateSession(
-        sessionId,
-        pdfName,
-        path.join(sessionFolder, pdfName),
-      )
-
-      sessionManager.registerConnection(sessionId, ws)
-      const agent = sessionManager.getOrCreateAgent(sessionId, llmConfig)
-
-      AgentDispatcher.send(ws, {
-        type: AgentMessageType.SESSION_CREATED,
-        ...(msg.id ? { id: msg.id } : {}),
-        payload: { sessionId },
-      })
-
-      await agent.sendMessage({
-        prompt: msg.payload.prompt,
-        pdf: msg.payload.pdf,
-        images: msg.payload.images,
-      })
-    })
-
     this.register(AgentMessageType.CHAT_REQUEST, async (ws, msg, logger) => {
-      const sessionId = msg.payload.sessionId ?? ws.url
       const llmConfig = getAIConfig()
 
+      const sessionId = msg.payload.sessionId
+      const session = sessionManager.getSession(sessionId)
+      if (!session) {
+        AgentDispatcher.send(ws, {
+          type: AgentMessageType.ERROR,
+          payload: { error: "Session not found" },
+        })
+        return
+      }
+
       sessionManager.registerConnection(sessionId, ws)
-      const agent = sessionManager.getOrCreateAgent(
-        sessionId,
-        llmConfig,
-        msg.payload.sessionId,
-      )
+      const agent = session.getOrCreateAgent(llmConfig)
+
       await agent.sendMessage({
         prompt: msg.payload.prompt,
         images: msg.payload.images,
@@ -110,6 +76,7 @@ export class AgentDispatcher {
 
     this.register(AgentMessageType.CHAT_INTERRUPT, (ws, _msg, logger) => {
       logger.info("Chat interrupted")
+
       AgentDispatcher.send(ws, {
         type: AgentMessageType.SYSTEM,
         payload: { message: "Interrupted successfully" },

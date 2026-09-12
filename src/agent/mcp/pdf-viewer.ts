@@ -8,9 +8,8 @@ import {
 } from "@anthropic-ai/claude-agent-sdk"
 import type { McpToolResult } from "../../types/agent-types.js"
 import { PDFMessageType } from "../../types/pdf-types.js"
-import type { WsContext } from "../../session/agent-session.js"
-import { pdfSessionManager } from "../../session/pdf-session.js"
-import { getFolderItemsList } from "../../session/temporary-files.js"
+import type { WsContext } from "../../types/types.js"
+import { sessionManager } from "../../session/session.js"
 import { sendOnly } from "../../utils/ws-messenger.js"
 
 export function createPDFViewerMcpServer(wsCtx: WsContext) {
@@ -65,12 +64,12 @@ function getActiveSocket(wsCtx: WsContext): WebSocket {
 }
 
 async function loadPDFPage(pdfName: string, pageNum: number, wsCtx: WsContext) {
-  const session = pdfSessionManager.getSession(wsCtx.sessionId)
-  if (!session || session.pdfName !== path.basename(pdfName)) {
+  const session = sessionManager.getSession(wsCtx.sessionId)
+  if (!session || session.pdfContext.pdfName !== path.basename(pdfName)) {
     throw new Error(`PDF session not found for ${pdfName}`)
   }
 
-  const document = await pdfSessionManager.loadInstance(session)
+  const document = await session.pdfContext.loadInstance()
   if (
     !Number.isInteger(pageNum) ||
     pageNum < 1 ||
@@ -128,7 +127,10 @@ async function getLocalPDFPage(
 
 async function listSessionFiles(wsCtx: WsContext): Promise<McpToolResult> {
   try {
-    const files = await getFolderItemsList(wsCtx.sessionId)
+    const session = sessionManager.getSession(wsCtx.sessionId)
+    if (!session) throw new Error("Session not found")
+
+    const files = await session.fileOps.getFolderItemsList()
     return {
       content: [{ type: "text", text: files.join("\n") || "No files found" }],
     }
@@ -157,7 +159,7 @@ async function handleJumpToPage(
       type: PDFMessageType.JUMP_TO_PAGE,
       payload: { pageNum },
     })
-    pdfSessionManager.updatePage(session.sessionId, pageNum)
+    session.pdfContext.updatePage(pageNum)
     return getLocalPDFPage(pdfName, pageNum, wsCtx)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
@@ -175,16 +177,19 @@ async function handleNextPage(
   pdfName: string,
 ): Promise<McpToolResult> {
   try {
-    const session = pdfSessionManager.getSession(wsCtx.sessionId)
-    if (!session || session.pdfName !== path.basename(pdfName)) {
+    const session = sessionManager.getSession(wsCtx.sessionId)
+    if (!session || session.pdfContext.pdfName !== path.basename(pdfName)) {
       throw new Error(`PDF session not found for ${pdfName}`)
     }
-    const document = await pdfSessionManager.loadInstance(session)
-    const nextPage = Math.min(session.currentPage + 1, document.numPages)
+    const document = await session.pdfContext.loadInstance()
+    const nextPage = Math.min(
+      session.pdfContext.currentPage + 1,
+      document.numPages,
+    )
     await document.getPage(nextPage)
     const ws = getActiveSocket(wsCtx)
     sendOnly(ws, { type: PDFMessageType.NEXT_PAGE })
-    pdfSessionManager.updatePage(session.sessionId, nextPage)
+    session.pdfContext.updatePage(nextPage)
     return getLocalPDFPage(pdfName, nextPage, wsCtx)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
@@ -202,16 +207,16 @@ async function handlePreviousPage(
   pdfName: string,
 ): Promise<McpToolResult> {
   try {
-    const session = pdfSessionManager.getSession(wsCtx.sessionId)
-    if (!session || session.pdfName !== path.basename(pdfName)) {
+    const session = sessionManager.getSession(wsCtx.sessionId)
+    if (!session || session.pdfContext.pdfName !== path.basename(pdfName)) {
       throw new Error(`PDF session not found for ${pdfName}`)
     }
-    const previousPage = Math.max(session.currentPage - 1, 1)
-    const document = await pdfSessionManager.loadInstance(session)
+    const previousPage = Math.max(session.pdfContext.currentPage - 1, 1)
+    const document = await session.pdfContext.loadInstance()
     await document.getPage(previousPage)
     const ws = getActiveSocket(wsCtx)
     sendOnly(ws, { type: PDFMessageType.PREVIOUS_PAGE })
-    pdfSessionManager.updatePage(session.sessionId, previousPage)
+    session.pdfContext.updatePage(previousPage)
     return getLocalPDFPage(pdfName, previousPage, wsCtx)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)

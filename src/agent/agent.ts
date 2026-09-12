@@ -1,7 +1,7 @@
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk"
 import { createPDFViewerMcpServer } from "./mcp/pdf-viewer.js"
 import type { AgentInput, AIConfig } from "../types/agent-types.js"
-import type { WsContext } from "../session/agent-session.js"
+import type { WsContext } from "../types/types.js"
 import { logAgentError } from "../utils/log.js"
 
 type UserContentBlock =
@@ -134,7 +134,8 @@ export class Agent {
           },
           pdfViewer: createPDFViewerMcpServer(this.wsCtx),
         },
-        permissionMode: "dontAsk",
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
         allowedTools: ["mcp__playwright__*", "mcp__pdf-viewer__*"],
       },
     })

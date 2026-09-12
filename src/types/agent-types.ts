@@ -17,7 +17,6 @@ export interface AIConfig {
 
 export enum AgentMessageType {
   // Client -> Backend
-  CREATE_SESSION = "agent:create_session",
   CHAT_REQUEST = "agent:chat_request",
   CHAT_INTERRUPT = "agent:chat_interrupt",
 
@@ -35,27 +34,12 @@ export enum AgentMessageType {
 
 const ImageBase64Schema = z.string().min(1, "Image data cannot be empty")
 
-const PdfInputSchema = z.object({
-  filename: z.string().min(1, "PDF filename cannot be empty"),
-  data: z.string().min(1, "PDF data cannot be empty"),
-})
-
-export const CreateSessionSchema = z.object({
-  type: z.literal(AgentMessageType.CREATE_SESSION),
-  id: z.string().optional(),
-  payload: z.object({
-    prompt: z.string().min(1, "Prompt cannot be empty"),
-    pdf: PdfInputSchema,
-    images: z.array(ImageBase64Schema).default([]),
-  }),
-})
-
 export const ChatRequestSchema = z.object({
   type: z.literal(AgentMessageType.CHAT_REQUEST),
   id: z.string().optional(),
   payload: z.object({
     prompt: z.string().min(1, "Prompt cannot be empty"),
-    sessionId: z.string().optional(),
+    sessionId: z.string().min(1, "sessionId is required"),
     images: z.array(ImageBase64Schema).default([]),
   }),
 })
@@ -67,7 +51,6 @@ export const ChatInterruptSchema = z.object({
 })
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
-  CreateSessionSchema,
   ChatRequestSchema,
   ChatInterruptSchema,
 ])
@@ -101,12 +84,11 @@ interface BaseMessage<T extends AgentMessageType, P = void> {
 
 export type AgentChatRequestMessage = BaseMessage<
   AgentMessageType.CHAT_REQUEST,
-  { prompt: string; sessionId?: string; images?: string[] }
->
-
-export type AgentCreateSessionMessage = BaseMessage<
-  AgentMessageType.CREATE_SESSION,
-  { prompt: string; pdf: { filename: string; data: string }; images: string[] }
+  {
+    prompt: string
+    sessionId: string
+    images?: string[]
+  }
 >
 
 export type AgentChatInterruptMessage = BaseMessage<
@@ -160,9 +142,7 @@ export type AgentSessionCreatedMessage = BaseMessage<
 >
 
 export type AgentClientToBackendMessage =
-  | AgentCreateSessionMessage
-  | AgentChatRequestMessage
-  | AgentChatInterruptMessage
+  AgentChatRequestMessage | AgentChatInterruptMessage
 
 export type AgentBackendToClientMessage =
   | AgentToolCallMessage

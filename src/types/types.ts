@@ -8,6 +8,7 @@ import type {
   PDFClientToBackendMessage,
   PDFWebSocketMessage,
 } from "./pdf-types.js"
+import WebSocket from "ws"
 
 export type WebsocketMessage = PDFWebSocketMessage | AgentWebSocketMessage
 
@@ -16,3 +17,8 @@ export type ClientToBackendMessage =
 
 export type BackendToClientMessage =
   AgentBackendToClientMessage | PDFBackendToClientMessage
+
+export interface WsContext {
+  readonly sessionId: string
+  current: WebSocket | null
+}

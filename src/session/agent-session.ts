@@ -1,209 +1,185 @@
-import type { WebSocket } from "ws"
-import type { AgentInput, AIConfig } from "../types/agent-types.js"
-import { AgentMessageType } from "../types/agent-types.js"
-import { Agent } from "../agent/agent.js"
-import { sendOnly } from "../utils/ws-messenger.js"
-import { logAgentError } from "../utils/log.js"
+// import type { WebSocket } from "ws"
+// import type { AgentInput, AIConfig } from "../types/agent-types.js"
+// import { AgentMessageType } from "../types/agent-types.js"
+// import { Agent } from "../agent/agent.js"
+// import { sendOnly } from "../utils/ws-messenger.js"
+// import { logAgentError } from "../utils/log.js"
+// import type { WsContext } from "../types/types.js";
 
-export interface WsContext {
-  readonly sessionId: string
-  current: WebSocket | null
-}
+// export class AgentSession {
+//   private agent: Agent
 
-export class AgentSessionManager {
-  // Connection Pool
-  private connections = new Map<string, WsContext>()
-  // Session Pool
-  private sessions = new Map<string, Agent>()
+//   public getOrCreateAgent(
+//     sessionId: string,
+//     llmConfig: AIConfig,
+//     resumeSessionId?: string,
+//   ): Agent {
+//     let agent = this.sessions.get(sessionId)
+//     const wsCtx = this.connections.get(sessionId)
 
-  public registerConnection(sessionId: string, ws: WebSocket): void {
-    let ctx = this.connections.get(sessionId)
-    if (!ctx) {
-      ctx = { sessionId, current: ws }
-      this.connections.set(sessionId, ctx)
-    } else {
-      ctx.current = ws
-    }
-  }
+//     if (!wsCtx) throw new Error("WebSocket connection not registered")
 
-  public removeConnection(sessionId: string): void {
-    const ctx = this.connections.get(sessionId)
-    if (ctx) ctx.current = null
-  }
+//     if (!agent) {
+//       agent = new Agent(llmConfig, wsCtx, resumeSessionId)
+//       this.sessions.set(sessionId, agent)
 
-  public getOrCreateAgent(
-    sessionId: string,
-    llmConfig: AIConfig,
-    resumeSessionId?: string,
-  ): Agent {
-    let agent = this.sessions.get(sessionId)
-    const wsCtx = this.connections.get(sessionId)
+//       this.consumeAgentStream(sessionId, agent)
+//     }
 
-    if (!wsCtx) throw new Error("WebSocket connection not registered")
+//     return agent
+//   }
 
-    if (!agent) {
-      agent = new Agent(llmConfig, wsCtx, resumeSessionId)
-      this.sessions.set(sessionId, agent)
+//   public async sendMessage(
+//     sessionId: string,
+//     input: AgentInput,
+//   ): Promise<void> {
+//     const agent = this.sessions.get(sessionId)
+//     if (!agent) throw new Error("Session not found")
+//     await agent.sendMessage(input)
+//   }
 
-      this.consumeAgentStream(sessionId, agent)
-    }
+//   public async destroyAgent(sessionId: string): Promise<void> {
+//     const agent = this.sessions.get(sessionId)
+//     if (agent) {
+//       await agent.destroy()
+//       this.sessions.delete(sessionId)
+//     }
+//     this.connections.delete(sessionId)
+//   }
 
-    return agent
-  }
+//   private async consumeAgentStream(sessionId: string, agent: Agent) {
+//     try {
+//       for await (const chunk of agent.getOutputStream()) {
+//         const wsCtx = this.connections.get(sessionId)
+//         if (!wsCtx?.current) continue
 
-  public async sendMessage(
-    sessionId: string,
-    input: AgentInput,
-  ): Promise<void> {
-    const agent = this.sessions.get(sessionId)
-    if (!agent) throw new Error("Session not found")
-    await agent.sendMessage(input)
-  }
+//         for (const message of getBackendMessages(chunk, wsCtx.sessionId)) {
+//           sendOnly(wsCtx.current, message)
+//         }
 
-  public async destroyAgent(sessionId: string): Promise<void> {
-    const agent = this.sessions.get(sessionId)
-    if (agent) {
-      await agent.destroy()
-      this.sessions.delete(sessionId)
-    }
-    this.connections.delete(sessionId)
-  }
+//         if (chunk.type === "result") {
+//           if (chunk.is_error) {
+//             logAgentError(chunk, { sessionId, phase: "agent result" })
+//           }
 
-  private async consumeAgentStream(sessionId: string, agent: Agent) {
-    try {
-      for await (const chunk of agent.getOutputStream()) {
-        const wsCtx = this.connections.get(sessionId)
-        if (!wsCtx?.current) continue
+//           sendOnly(wsCtx.current, {
+//             type: AgentMessageType.FINAL,
+//             payload: {
+//               sessionId: wsCtx.sessionId,
+//               success: !chunk.is_error,
+//               ...(typeof chunk.total_cost_usd === "number"
+//                 ? { cost: String(chunk.total_cost_usd) }
+//                 : {}),
+//               ...(typeof chunk.duration_ms === "number"
+//                 ? { duration: String(chunk.duration_ms) }
+//                 : {}),
+//             },
+//           })
+//         }
+//       }
+//     } catch (err) {
+//       logAgentError(err, { sessionId, phase: "agent stream" })
+//       const wsCtx = this.connections.get(sessionId)
+//       if (wsCtx?.current) {
+//         sendOnly(wsCtx.current, {
+//           type: AgentMessageType.ERROR,
+//           payload: {
+//             error: err instanceof Error ? err.message : String(err),
+//             code: "AGENT_STREAM_ERROR",
+//           },
+//         })
+//       }
+//     }
+//   }
+// }
 
-        for (const message of getBackendMessages(chunk, wsCtx.sessionId)) {
-          sendOnly(wsCtx.current, message)
-        }
+// function getBackendMessages(
+//   chunk: { type?: string; [key: string]: unknown },
+//   sessionId: string,
+// ): Array<
+//   | {
+//       type: AgentMessageType.TEXT_DELTA
+//       payload: { sessionId: string; text: string }
+//     }
+//   | {
+//       type: AgentMessageType.TOOL_CALL
+//       payload: { name: string; id: string; input: Record<string, unknown> }
+//     }
+//   | {
+//       type: AgentMessageType.TOOL_RESULT
+//       payload: { id: string; name: string; result: unknown; error?: string }
+//     }
+// > {
+//   const results: any[] = []
 
-        if (chunk.type === "result") {
-          if (chunk.is_error) {
-            logAgentError(chunk, { sessionId, phase: "agent result" })
-          }
+//   if (chunk.type === "stream_event" && isRecord(chunk.event)) {
+//     const event = chunk.event
+//     if (
+//       event.type === "content_block_delta" &&
+//       isRecord(event.delta) &&
+//       event.delta.type === "text_delta"
+//     ) {
+//       results.push({
+//         type: AgentMessageType.TEXT_DELTA,
+//         payload: { sessionId, text: String(event.delta.text) },
+//       })
+//     }
+//   }
 
-          sendOnly(wsCtx.current, {
-            type: AgentMessageType.FINAL,
-            payload: {
-              sessionId: wsCtx.sessionId,
-              success: !chunk.is_error,
-              ...(typeof chunk.total_cost_usd === "number"
-                ? { cost: String(chunk.total_cost_usd) }
-                : {}),
-              ...(typeof chunk.duration_ms === "number"
-                ? { duration: String(chunk.duration_ms) }
-                : {}),
-            },
-          })
-        }
-      }
-    } catch (err) {
-      logAgentError(err, { sessionId, phase: "agent stream" })
-      const wsCtx = this.connections.get(sessionId)
-      if (wsCtx?.current) {
-        sendOnly(wsCtx.current, {
-          type: AgentMessageType.ERROR,
-          payload: {
-            error: err instanceof Error ? err.message : String(err),
-            code: "AGENT_STREAM_ERROR",
-          },
-        })
-      }
-    }
-  }
-}
+//   if (chunk.type === "assistant" && isRecord(chunk.message)) {
+//     const content = Array.isArray(chunk.message.content)
+//       ? chunk.message.content
+//       : []
 
-function getBackendMessages(
-  chunk: { type?: string; [key: string]: unknown },
-  sessionId: string,
-): Array<
-  | {
-      type: AgentMessageType.TEXT_DELTA
-      payload: { sessionId: string; text: string }
-    }
-  | {
-      type: AgentMessageType.TOOL_CALL
-      payload: { name: string; id: string; input: Record<string, unknown> }
-    }
-  | {
-      type: AgentMessageType.TOOL_RESULT
-      payload: { id: string; name: string; result: unknown; error?: string }
-    }
-> {
-  const results: any[] = []
+//     for (const block of content) {
+//       if (!isRecord(block)) continue
 
-  if (chunk.type === "stream_event" && isRecord(chunk.event)) {
-    const event = chunk.event
-    if (
-      event.type === "content_block_delta" &&
-      isRecord(event.delta) &&
-      event.delta.type === "text_delta"
-    ) {
-      results.push({
-        type: AgentMessageType.TEXT_DELTA,
-        payload: { sessionId, text: String(event.delta.text) },
-      })
-    }
-  }
+//       if (block.type === "tool_use") {
+//         results.push({
+//           type: AgentMessageType.TOOL_CALL,
+//           payload: {
+//             id: String(block.id),
+//             name: String(block.name),
+//             input: isRecord(block.input) ? block.input : {},
+//           },
+//         })
+//       }
+//     }
+//   }
 
-  if (chunk.type === "assistant" && isRecord(chunk.message)) {
-    const content = Array.isArray(chunk.message.content)
-      ? chunk.message.content
-      : []
+//   if (chunk.type === "user" && isRecord(chunk.message)) {
+//     const content = Array.isArray(chunk.message.content)
+//       ? chunk.message.content
+//       : []
 
-    for (const block of content) {
-      if (!isRecord(block)) continue
+//     for (const block of content) {
+//       if (!isRecord(block)) continue
 
-      if (block.type === "tool_use") {
-        results.push({
-          type: AgentMessageType.TOOL_CALL,
-          payload: {
-            id: String(block.id),
-            name: String(block.name),
-            input: isRecord(block.input) ? block.input : {},
-          },
-        })
-      }
-    }
-  }
+//       if (block.type === "tool_result") {
+//         const isError = Boolean(block.is_error)
+//         results.push({
+//           type: AgentMessageType.TOOL_RESULT,
+//           payload: {
+//             id: String(block.tool_use_id),
+//             name: String(block.name || "unknown"),
+//             result: block.content,
+//             ...(isError
+//               ? {
+//                   error:
+//                     typeof block.content === "string"
+//                       ? block.content
+//                       : "Tool execution failed",
+//                 }
+//               : {}),
+//           },
+//         })
+//       }
+//     }
+//   }
 
-  if (chunk.type === "user" && isRecord(chunk.message)) {
-    const content = Array.isArray(chunk.message.content)
-      ? chunk.message.content
-      : []
+//   return results
+// }
 
-    for (const block of content) {
-      if (!isRecord(block)) continue
-
-      if (block.type === "tool_result") {
-        const isError = Boolean(block.is_error)
-        results.push({
-          type: AgentMessageType.TOOL_RESULT,
-          payload: {
-            id: String(block.tool_use_id),
-            name: String(block.name || "unknown"),
-            result: block.content,
-            ...(isError
-              ? {
-                  error:
-                    typeof block.content === "string"
-                      ? block.content
-                      : "Tool execution failed",
-                }
-              : {}),
-          },
-        })
-      }
-    }
-  }
-
-  return results
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-export const sessionManager = new AgentSessionManager()
+// function isRecord(value: unknown): value is Record<string, unknown> {
+//   return typeof value === "object" && value !== null && !Array.isArray(value)
+// }
